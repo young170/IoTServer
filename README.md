@@ -6,7 +6,7 @@ IoT Server using NodeMCU and Raspberry pi
   * ECE30003-01 IoT 시스템 설계
 * Contributors
   * 22100113 김성빈
-  * 219XXXXX 심정훈
+  * 21900413 심정훈
 
 ## NodeMCU
 ### NodeMCU Pins
