@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "DHTesp.h"
@@ -98,22 +99,6 @@ void display_sensors(float temperature, float humidity, int lightValue) {
   display.display();
 }
 
-void onConnectionEstablished() {
-  mqtt_client.subscribe(mqtt_topic, [](const String & payload) {
-    Serial.println(payload);
-
-    /*
-    payload json
-    cds
-    dht
-    led
-    change led state
-    */
-  });
-
-  Serial.println("Connection Established");
-}
-
 ////////////// setup() //////////////
 void setup() {
   Serial.begin(9600);
@@ -155,6 +140,11 @@ void setup() {
 ////////////// loop() //////////////
 void loop() {
   // mqtt subscribe
+  // if (!mqtt_client.isConnected()) {
+  //   Serial.print(".");
+  //   mqtt_client.setMqttReconnectionAttemptDelay(500);
+  // }
+  // Serial.println("mqtt connected");
   mqtt_client.loop();
 
   // current time
@@ -177,6 +167,7 @@ void loop() {
     } else {
       // display dht + cds values to OLED display, and publish data to mqtt_topic
       display_sensors(temperature, humidity, lightValue);
+      // mqtt_client.publish("iot/22100113", "test_display()");
     }
   }
 
@@ -204,4 +195,28 @@ void loop() {
   } else {
     digitalWrite(RELAY_PIN, RELAY_OFF);
   }
+}
+
+void onConnectionEstablished() {
+  mqtt_client.subscribe(mqtt_topic, [](const String & payload) {
+    Serial.println(payload);
+
+    /*
+    payload json
+    cds
+    dht
+    led
+    change led state
+    */
+  });
+
+  // // publish data to mqtt
+  // StaticJsonBuffer<200> jsonBuffer;
+  // char *json;
+  // sprintf(json, "{\"temp\":%3.2f,\"cds\":%d,\"hum\":%3.2f}", temperature, lightValue, humidity);
+  // JsonObject& root = jsonBuffer.parseObject(json);
+  // if(!root.success()) {
+  //   Serial.println("parseObject() failed");
+  // }
+  mqtt_client.publish("iot/22100113", "test_connected()");
 }
