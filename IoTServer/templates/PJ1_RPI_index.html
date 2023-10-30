@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab4_rpi_flask_nodeMCU_LED_CONTROL</title>
+</head>
+<body>
+    <div style="width: 300px; margin: auto; text-align: center;">
+        <h1>Welcome to IoT Lab7 Main Page</h1>
+        <h2>NodeMCU Web Server</h2>
+
+		<h2>21900413 NodeMCU</h2>
+        <button type="button" onclick="location.href='/led'">LED</button>
+        <button type="button" onclick="location.href='/led_on'">LED ON</button>
+        <button type="button" onclick="location.href='/led_off'">LED OFF</button><br>
+		<button type="button" onclick="location.href='/usb'">USB</button>
+        <button type="button" onclick="location.href='/usb_on'">USB ON</button>
+        <button type="button" onclick="location.href='/usb_off'">USB OFF</button>
+        <a href="/iot/21900413/cds"><button>Get a Light Intensity</button></a>
+        <a href="/iot/21900413/dht"><button>Get temperature and humidity</button></a><br/>
+        <p> Result: {{result}}</p>
+    </div>
+	<div style="width: 300px; margin: auto; text-align: center;">
+        <h2>22100113 NodeMCU</h2>
+        <button type="button" onclick="location.href='/led'">LED</button>
+        <button type="button" onclick="location.href='/led_on'">LED ON</button>
+        <button type="button" onclick="location.href='/led_off'">LED OFF</button><br>
+		<button type="button" onclick="location.href='/usb'">USB</button>
+        <button type="button" onclick="location.href='/usb_on'">USB ON</button>
+        <button type="button" onclick="location.href='/usb_off'">USB OFF</button>
+        <a href="/iot/22100113/cds"><button>Get a Light Intensity</button></a>
+        <a href="/iot/22100113/dht"><button>Get temperature and humidity</button></a><br/>
+        <p> Result: {{result}}</p>
+    </div>       
+</body>
+
+</html>
