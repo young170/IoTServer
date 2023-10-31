@@ -1,3 +1,4 @@
+#if 0
 /*
  * Example of parsing JSON with <Arduino_JSON.h>
  * Change the WifiSSID, WifiPassword for testing
@@ -71,3 +72,4 @@ void loop()
   mqtt_client.loop();
 
 }
+#endif

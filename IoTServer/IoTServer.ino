@@ -2,7 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <ArduinoJson.h>
+#include <Arduino_JSON.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "DHTesp.h"
@@ -35,6 +35,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET); // dis
 // CDS light intensity value
 int lightValue;
 
+// led light state
+int led_light_state = LOW;
+
 // USBLED states
 enum state {
   CMD_ON_STATE,
@@ -53,18 +56,19 @@ DHTesp dht;
 float temperature, humidity;
 
 // DHT22 read dhtInterval
+unsigned long currMillis;
 unsigned long prevMillis = 0;
 const long dhtInterval = 10000; // 10s
 
 // MQTT data
 #define mqtt_broker "sweetdream.iptime.org"
-#define mqtt_clientname "espNode@HGU"
+#define mqtt_clientname "22100113@SB"
 #define MQTTUsername "iot"
 #define MQTTPassword "csee1414"
 
-const char *WifiSSID = "NTH413";
-const char *WifiPassword = "cseenth413";
-const char *mqtt_topic = "iot/22100113";
+const char *WifiSSID = "ISEL";
+const char *WifiPassword = "024499312";
+String mqtt_topic = "iot/22100113";
 
 EspMQTTClient mqtt_client(
   WifiSSID,
@@ -75,6 +79,8 @@ EspMQTTClient mqtt_client(
   mqtt_clientname,  // Client name that uniquely identify your device
   1883              // The MQTT port, default to 1883. this line can be omitted
 );
+
+JSONVar rpi_json;
 
 void display_sensors(float temperature, float humidity, int lightValue) {
   // setup display
@@ -99,16 +105,20 @@ void display_sensors(float temperature, float humidity, int lightValue) {
   display.display();
 }
 
+void cds_dht_mqtt_publish(void) {
+  // JSON init
+  mqtt_client.publish(mqtt_topic, "publish");
+}
+
 ////////////// setup() //////////////
 void setup() {
   Serial.begin(9600);
 
   // init WiFi connection
   WiFi.mode(WIFI_STA);
-  WiFi.enableInsecureWEP(true);
   WiFi.begin(WifiSSID, WifiPassword);
 
-  // connect NodeMCU to WiFi
+  // // connect NodeMCU to WiFi
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -135,20 +145,19 @@ void setup() {
 
   // init DHT22
   dht.setup(DHTPIN, DHTesp::DHTTYPE);
+
+  // enable mqtt debugging
+  // mqtt_client.enableDebuggingMessages();
+  // mqtt_client.enableHTTPWebUpdater();
 }
 
 ////////////// loop() //////////////
 void loop() {
   // mqtt subscribe
-  // if (!mqtt_client.isConnected()) {
-  //   Serial.print(".");
-  //   mqtt_client.setMqttReconnectionAttemptDelay(500);
-  // }
-  // Serial.println("mqtt connected");
   mqtt_client.loop();
 
   // current time
-  unsigned long currMillis = millis();
+  currMillis = millis();
 
   // read current light value
   lightValue = analogRead(CDS_PIN);
@@ -167,7 +176,7 @@ void loop() {
     } else {
       // display dht + cds values to OLED display, and publish data to mqtt_topic
       display_sensors(temperature, humidity, lightValue);
-      // mqtt_client.publish("iot/22100113", "test_display()");
+      cds_dht_mqtt_publish();
     }
   }
 
@@ -200,23 +209,45 @@ void loop() {
 void onConnectionEstablished() {
   mqtt_client.subscribe(mqtt_topic, [](const String & payload) {
     Serial.println(payload);
+    rpi_json = JSON.parse(payload);
 
-    /*
-    payload json
-    cds
-    dht
-    led
-    change led state
-    */
+    if ((int) rpi_json["cds"] == 1) {
+      String cds_mqtt_topic = mqtt_topic += "/cds";
+      mqtt_client.publish(mqtt_topic, String(lightValue));
+      Serial.print("cds is 1");
+    }
+    else if ((int) rpi_json["temp"] == 1) {
+      String temp_mqtt_topic = mqtt_topic += "/temp";
+      mqtt_client.publish(mqtt_topic, String(temperature));
+      Serial.print("temp is 1");
+    }
+    else if ((int) rpi_json["hum"] == 1) {
+      String temp_mqtt_topic = mqtt_topic += "/hum";
+      mqtt_client.publish(mqtt_topic, String(humidity));
+      Serial.print("hum is 1");
+    }
+    else if ((int) rpi_json["led"] == 1) {
+      led_light_state = led_light_state % 1; // 0 -> 1, 1 -> 0
+      digitalWrite(LED_PIN, led_light_state);
+      Serial.print("led is 1");
+    }
+    else if ((int) rpi_json["led_on"] == 1) {
+      led_light_state = HIGH;
+      digitalWrite(LED_PIN, led_light_state);
+      Serial.print("led_on is 1");
+    }
+    else if ((int) rpi_json["led_off"] == 1) {
+      led_light_state = LOW;
+      digitalWrite(LED_PIN, led_light_state);
+      Serial.print("led_off is 1");
+    }
+    else if ((int) rpi_json["usb_on"] == 1) {
+      digitalWrite(RELAY_PIN, RELAY_ON);
+      Serial.print("usb_on is 1");
+    }
+    else if ((int) rpi_json["usb_off"] == 1) {
+      digitalWrite(RELAY_PIN, RELAY_OFF);
+      Serial.print("usb_off is 1");
+    }
   });
-
-  // // publish data to mqtt
-  // StaticJsonBuffer<200> jsonBuffer;
-  // char *json;
-  // sprintf(json, "{\"temp\":%3.2f,\"cds\":%d,\"hum\":%3.2f}", temperature, lightValue, humidity);
-  // JsonObject& root = jsonBuffer.parseObject(json);
-  // if(!root.success()) {
-  //   Serial.println("parseObject() failed");
-  // }
-  mqtt_client.publish("iot/22100113", "test_connected()");
 }
