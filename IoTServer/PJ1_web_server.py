@@ -108,7 +108,7 @@ def handle_mqtt_message(client, userdata, message):
     payload = message.payload.decode('utf-8')
     json_to_dic = json.loads(payload)
     mqtt_temp = json_to_dic['temp']
-    mqtt_hum = json_to_dic['dht22']
+    mqtt_hum = json_to_dic['hum']
     mqtt_cds = json_to_dic['cds']
     print("Topic: ", topic, "temp: ", mqtt_temp, "hum: ", mqtt_hum, "cds: ", mqtt_cds)
 
