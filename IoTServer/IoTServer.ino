@@ -1,7 +1,5 @@
 #include "EspMQTTClient.h"
 #include <ESP8266WiFi.h>
-#include <SPI.h>
-#include <Wire.h>
 #include <Arduino_JSON.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -23,6 +21,7 @@
 // Relay states, active-low
 #define RELAY_OFF HIGH
 #define RELAY_ON LOW
+int relay_state = LOW;
 
 // OLED display dimensions
 #define SCREEN_WIDTH 128    // OLED display width, in pixels
@@ -66,8 +65,8 @@ const long dhtInterval = 10000; // 10s
 #define MQTTUsername "iot"
 #define MQTTPassword "csee1414"
 
-const char *WifiSSID = "ISEL";
-const char *WifiPassword = "024499312";
+const char *WifiSSID = "NTH413";
+const char *WifiPassword = "cseenth413";
 String mqtt_topic = "iot/22100113";
 
 EspMQTTClient mqtt_client(
@@ -107,7 +106,13 @@ void display_sensors(float temperature, float humidity, int lightValue) {
 
 void cds_dht_mqtt_publish(void) {
   // JSON init
-  mqtt_client.publish(mqtt_topic, "publish");
+  JSONVar myObject;
+  myObject["temp"] = (int) temperature;
+  myObject["hum"] = (int) humidity;
+  myObject["cds"] = lightValue;  
+  String jsonString = JSON.stringify(myObject);
+
+  mqtt_client.publish("iot/22100113/data", jsonString);
 }
 
 ////////////// setup() //////////////
@@ -116,14 +121,6 @@ void setup() {
 
   // init WiFi connection
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WifiSSID, WifiPassword);
-
-  // // connect NodeMCU to WiFi
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("WiFi Connected");
 
   // init OLED display
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -147,7 +144,7 @@ void setup() {
   dht.setup(DHTPIN, DHTesp::DHTTYPE);
 
   // enable mqtt debugging
-  // mqtt_client.enableDebuggingMessages();
+  mqtt_client.enableDebuggingMessages();
   // mqtt_client.enableHTTPWebUpdater();
 }
 
@@ -180,9 +177,9 @@ void loop() {
     }
   }
 
-  // control USBLED depending on cds value
+  // // control USBLED depending on cds value
   if (CMD_ON_STATE != currState) {                    // CMD has highest precedence
-    if (lightValue > 190) {                           // if bright state
+    if (lightValue > 180) {                           // if bright state
       currState = LIGHT_STATE;                        // current state = bright state
     } else if (lightValue < 140) {                    // if dark state
       if (LIGHT_STATE == currState) {                 // if prev state = light state, an event
@@ -201,8 +198,10 @@ void loop() {
   // if CMD_ON is given, or event occured: turn on USBLED
   if (CMD_ON_STATE == currState || FIRST_DARK_STATE == currState) {
     digitalWrite(RELAY_PIN, RELAY_ON);
+    relay_state = RELAY_ON;
   } else {
     digitalWrite(RELAY_PIN, RELAY_OFF);
+    relay_state = RELAY_OFF;
   }
 }
 
@@ -241,13 +240,33 @@ void onConnectionEstablished() {
       digitalWrite(LED_PIN, led_light_state);
       Serial.print("led_off is 1");
     }
+    else if ((int) rpi_json["usb"] == 1) {
+      if (currState != FIRST_DARK_STATE) {
+        relay_state = relay_state % 1; // 0 -> 1, 1 -> 0
+        digitalWrite(RELAY_PIN, relay_state);
+        
+        if (RELAY_ON == relay_state) {
+          currState = CMD_ON_STATE;
+        } else {
+          currState = DARK_STATE;
+        }
+      }
+
+      Serial.print("usb is 1");
+    }
     else if ((int) rpi_json["usb_on"] == 1) {
-      digitalWrite(RELAY_PIN, RELAY_ON);
+      relay_state = RELAY_ON;
+      digitalWrite(RELAY_PIN, relay_state);
+      currState = CMD_ON_STATE;
       Serial.print("usb_on is 1");
     }
     else if ((int) rpi_json["usb_off"] == 1) {
-      digitalWrite(RELAY_PIN, RELAY_OFF);
+      relay_state = RELAY_OFF;
+      digitalWrite(RELAY_PIN, relay_state);
+      currState = DARK_STATE;
       Serial.print("usb_off is 1");
     }
   });
+
+  mqtt_client.publish("iot/22100113", "Greetings from NodeMCU");
 }
