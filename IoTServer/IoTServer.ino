@@ -59,6 +59,11 @@ unsigned long currMillis;
 unsigned long prevMillis = 0;
 const long dhtInterval = 10000; // 10s
 
+// cds read cdsInterval
+unsigned long cds_currMillis;
+unsigned long cds_prevMillis = 0;
+const long cdsInterval = 1000; // 1s
+
 // MQTT data
 #define mqtt_broker "sweetdream.iptime.org"
 #define mqtt_clientname "22100113@SB"
@@ -154,18 +159,23 @@ void loop() {
   mqtt_client.loop();
 
   // current time
+  cds_currMillis = millis();
   currMillis = millis();
 
   // read current light value
-  lightValue = analogRead(CDS_PIN);
+  if (cds_currMillis - cds_prevMillis >= cdsInterval) {
+    cds_prevMillis = cds_currMillis;
+    lightValue = analogRead(CDS_PIN);
+    Serial.println(lightValue);
+  }
 
   // read DHT22 every 10000 millis, 10s
   if (currMillis - prevMillis >= dhtInterval) {
     prevMillis = currMillis;
 
     // delay(dht.getMinimumSamplingPeriod());
-    float temperature = dht.getTemperature();
-    float humidity = dht.getHumidity();
+    temperature = dht.getTemperature();
+    humidity = dht.getHumidity();
 
     // check validity of DHT22 values
     if (isnan(temperature) || isnan(humidity)) {
@@ -179,9 +189,9 @@ void loop() {
 
   // // control USBLED depending on cds value
   if (CMD_ON_STATE != currState) {                    // CMD has highest precedence
-    if (lightValue > 180) {                           // if bright state
+    if (lightValue > 100) {                           // if bright state
       currState = LIGHT_STATE;                        // current state = bright state
-    } else if (lightValue < 140) {                    // if dark state
+    } else if (lightValue < 50) {                     // if dark state
       if (LIGHT_STATE == currState) {                 // if prev state = light state, an event
         currState = FIRST_DARK_STATE;
         lightTimer = millis();                        // start 10s timer
@@ -226,7 +236,7 @@ void onConnectionEstablished() {
       Serial.print("hum is 1");
     }
     else if ((int) rpi_json["led"] == 1) {
-      led_light_state = led_light_state % 1; // 0 -> 1, 1 -> 0
+      led_light_state = !led_light_state; // 0 -> 1, 1 -> 0
       digitalWrite(LED_PIN, led_light_state);
       Serial.print("led is 1");
     }
@@ -242,7 +252,7 @@ void onConnectionEstablished() {
     }
     else if ((int) rpi_json["usb"] == 1) {
       if (currState != FIRST_DARK_STATE) {
-        relay_state = relay_state % 1; // 0 -> 1, 1 -> 0
+        relay_state = !relay_state; // 0 -> 1, 1 -> 0
         digitalWrite(RELAY_PIN, relay_state);
         
         if (RELAY_ON == relay_state) {
@@ -261,6 +271,7 @@ void onConnectionEstablished() {
       Serial.print("usb_on is 1");
     }
     else if ((int) rpi_json["usb_off"] == 1) {
+      lightTimer = -10;
       relay_state = RELAY_OFF;
       digitalWrite(RELAY_PIN, relay_state);
       currState = DARK_STATE;
