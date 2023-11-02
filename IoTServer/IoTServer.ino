@@ -21,7 +21,7 @@
 // Relay states, active-low
 #define RELAY_OFF HIGH
 #define RELAY_ON LOW
-int relay_state = LOW;
+int relayState = LOW;
 
 // OLED display dimensions
 #define SCREEN_WIDTH 128    // OLED display width, in pixels
@@ -35,13 +35,13 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET); // dis
 int lightValue;
 
 // led light state
-int led_light_state = LOW;
+int ledLightState = LOW;
 
 // USBLED states
 enum state {
-  CMD_ON_STATE,
+  CMD_ON_STATE = 0,
   LIGHT_STATE,
-  FIRST_DARK_STATE,
+  EVENT_STATE,
   DARK_STATE
 };
 enum state currState = LIGHT_STATE;
@@ -55,36 +55,34 @@ DHTesp dht;
 float temperature, humidity;
 
 // DHT22 read dhtInterval
-unsigned long currMillis;
-unsigned long prevMillis = 0;
+unsigned long dhtCurrMillis;
+unsigned long dhtPrevMillis = 0;
 const long dhtInterval = 10000; // 10s
 
 // cds read cdsInterval
-unsigned long cds_currMillis;
-unsigned long cds_prevMillis = 0;
+unsigned long cdsCurrMillis;
+unsigned long cdsPrevMillis = 0;
 const long cdsInterval = 1000; // 1s
 
 // MQTT data
-#define mqtt_broker "sweetdream.iptime.org"
-#define mqtt_clientname "22100113@SB"
+#define mqttBroker "sweetdream.iptime.org"
+#define mqttClientname "22100113@SB"
 #define MQTTUsername "iot"
 #define MQTTPassword "csee1414"
 
 const char *WifiSSID = "NTH413";
 const char *WifiPassword = "cseenth413";
-String mqtt_topic = "iot/22100113";
+String mqttTopic = "iot/22100113";
 
-EspMQTTClient mqtt_client(
+EspMQTTClient mqttClient(
   WifiSSID,
   WifiPassword,
-  mqtt_broker,      // MQTT Broker server ip
+  mqttBroker,      // MQTT Broker server ip
   MQTTUsername,     // Can be omitted if not needed
   MQTTPassword,     // Can be omitted if not needed
-  mqtt_clientname,  // Client name that uniquely identify your device
+  mqttClientname,  // Client name that uniquely identify your device
   1883              // The MQTT port, default to 1883. this line can be omitted
 );
-
-JSONVar rpi_json;
 
 void display_sensors(float temperature, float humidity, int lightValue) {
   // setup display
@@ -107,17 +105,6 @@ void display_sensors(float temperature, float humidity, int lightValue) {
   display.println(lightValue);
 
   display.display();
-}
-
-void cds_dht_mqtt_publish(void) {
-  // JSON init
-  JSONVar myObject;
-  myObject["temp"] = (int) temperature;
-  myObject["hum"] = (int) humidity;
-  myObject["cds"] = lightValue;  
-  String jsonString = JSON.stringify(myObject);
-
-  mqtt_client.publish("iot/22100113/data", jsonString);
 }
 
 ////////////// setup() //////////////
@@ -149,29 +136,28 @@ void setup() {
   dht.setup(DHTPIN, DHTesp::DHTTYPE);
 
   // enable mqtt debugging
-  mqtt_client.enableDebuggingMessages();
-  // mqtt_client.enableHTTPWebUpdater();
+  // mqttClient.enableDebuggingMessages();
+  // mqttClient.enableHTTPWebUpdater();
 }
 
 ////////////// loop() //////////////
 void loop() {
   // mqtt subscribe
-  mqtt_client.loop();
+  mqttClient.loop();
 
-  // current time
-  cds_currMillis = millis();
-  currMillis = millis();
+  // current time, cds and dht
+  cdsCurrMillis = millis();
+  dhtCurrMillis = millis();
 
-  // read current light value
-  if (cds_currMillis - cds_prevMillis >= cdsInterval) {
-    cds_prevMillis = cds_currMillis;
+  // read current light value, 1s
+  if (cdsCurrMillis - cdsPrevMillis >= cdsInterval) {
+    cdsPrevMillis = cdsCurrMillis;
     lightValue = analogRead(CDS_PIN);
-    Serial.println(lightValue);
   }
 
   // read DHT22 every 10000 millis, 10s
-  if (currMillis - prevMillis >= dhtInterval) {
-    prevMillis = currMillis;
+  if (dhtCurrMillis - dhtPrevMillis >= dhtInterval) {
+    dhtPrevMillis = dhtCurrMillis;
 
     // delay(dht.getMinimumSamplingPeriod());
     temperature = dht.getTemperature();
@@ -180,8 +166,9 @@ void loop() {
     // check validity of DHT22 values
     if (isnan(temperature) || isnan(humidity)) {
       Serial.println("Failed to read from DHT sensor");
-    } else {
-      // display dht + cds values to OLED display, and publish data to mqtt_topic
+    }
+    else {
+      // display dht + cds values to OLED display, and publish data to mqttTopic
       display_sensors(temperature, humidity, lightValue);
       cds_dht_mqtt_publish();
     }
@@ -191,93 +178,120 @@ void loop() {
   if (CMD_ON_STATE != currState) {                    // CMD has highest precedence
     if (lightValue > 100) {                           // if bright state
       currState = LIGHT_STATE;                        // current state = bright state
-    } else if (lightValue < 50) {                     // if dark state
+    }
+    else if (lightValue < 50) {                     // if dark state
       if (LIGHT_STATE == currState) {                 // if prev state = light state, an event
-        currState = FIRST_DARK_STATE;
+        currState = EVENT_STATE;
         lightTimer = millis();                        // start 10s timer
-      } else {                                        // if prev state = dark state, not an event
+      }
+      else {                                        // if prev state = dark state, not an event
         if (millis() - lightTimer > lightInterval) {  // if 10s passed
           currState = DARK_STATE;                     // turn off USBLED
-        } else {                                      // if 10s did not passed
-          currState = FIRST_DARK_STATE;               // keep USBLED on
+        }
+        else {                                      // if 10s did not passed
+          currState = EVENT_STATE;                    // keep USBLED on
         }
       }
     }
   }
 
   // if CMD_ON is given, or event occured: turn on USBLED
-  if (CMD_ON_STATE == currState || FIRST_DARK_STATE == currState) {
-    digitalWrite(RELAY_PIN, RELAY_ON);
-    relay_state = RELAY_ON;
-  } else {
-    digitalWrite(RELAY_PIN, RELAY_OFF);
-    relay_state = RELAY_OFF;
+  if (CMD_ON_STATE == currState || EVENT_STATE == currState) {
+    relayState = RELAY_ON;
+    digitalWrite(RELAY_PIN, relayState);
+  }
+  else {
+    relayState = RELAY_OFF;
+    digitalWrite(RELAY_PIN, relayState);
   }
 }
 
-void onConnectionEstablished() {
-  mqtt_client.subscribe(mqtt_topic, [](const String & payload) {
-    Serial.println(payload);
-    rpi_json = JSON.parse(payload);
+// publish {temperature, humidity, light_intensity} to mqtt
+void cds_dht_mqtt_publish(void) {
+  // JSON init
+  JSONVar myObject;
+  myObject["temp"] = (int) temperature;
+  myObject["hum"] = (int) humidity;
+  myObject["cds"] = lightValue;  
+  String jsonString = JSON.stringify(myObject);
 
-    if ((int) rpi_json["cds"] == 1) {
-      String cds_mqtt_topic = mqtt_topic += "/cds";
-      mqtt_client.publish(mqtt_topic, String(lightValue));
-      Serial.print("cds is 1");
+  String pubTopic = mqttTopic += "/data"
+  mqttClient.publish(pubTopic, jsonString);
+}
+
+// on mqtt connection established, read from subscribed topic
+void onConnectionEstablished() {
+  mqttClient.subscribe(mqttTopic, [](const String & payload) {
+    // JSON init
+    JSONVar rpiJson = JSON.parse(payload);
+
+    if ((int) rpiJson["cds"] == 1) {
+      String cds_mqttTopic = mqttTopic += "/cds";
+      mqttClient.publish(mqttTopic, String(lightValue));
+
+      Serial.print("cds");
     }
-    else if ((int) rpi_json["temp"] == 1) {
-      String temp_mqtt_topic = mqtt_topic += "/temp";
-      mqtt_client.publish(mqtt_topic, String(temperature));
-      Serial.print("temp is 1");
+    else if ((int) rpiJson["temp"] == 1) {
+      String temp_mqttTopic = mqttTopic += "/temp";
+      mqttClient.publish(mqttTopic, String(temperature));
+
+      Serial.print("temperature");
     }
-    else if ((int) rpi_json["hum"] == 1) {
-      String temp_mqtt_topic = mqtt_topic += "/hum";
-      mqtt_client.publish(mqtt_topic, String(humidity));
-      Serial.print("hum is 1");
+    else if ((int) rpiJson["hum"] == 1) {
+      String temp_mqttTopic = mqttTopic += "/hum";
+      mqttClient.publish(mqttTopic, String(humidity));
+
+      Serial.print("humidity");
     }
-    else if ((int) rpi_json["led"] == 1) {
-      led_light_state = !led_light_state; // 0 -> 1, 1 -> 0
-      digitalWrite(LED_PIN, led_light_state);
-      Serial.print("led is 1");
+    else if ((int) rpiJson["led"] == 1) { // led toggle
+      ledLightState = !ledLightState; // inverse current state
+      digitalWrite(LED_PIN, ledLightState);
+
+      Serial.print("led toggle");
     }
-    else if ((int) rpi_json["led_on"] == 1) {
-      led_light_state = HIGH;
-      digitalWrite(LED_PIN, led_light_state);
-      Serial.print("led_on is 1");
+    else if ((int) rpiJson["led_on"] == 1) {
+      ledLightState = HIGH;
+      digitalWrite(LED_PIN, ledLightState);
+
+      Serial.print("led_on");
     }
-    else if ((int) rpi_json["led_off"] == 1) {
-      led_light_state = LOW;
-      digitalWrite(LED_PIN, led_light_state);
-      Serial.print("led_off is 1");
+    else if ((int) rpiJson["led_off"] == 1) {
+      ledLightState = LOW;
+      digitalWrite(LED_PIN, ledLightState);
+
+      Serial.print("led_off");
     }
-    else if ((int) rpi_json["usb"] == 1) {
-      if (currState != FIRST_DARK_STATE) {
-        relay_state = !relay_state; // 0 -> 1, 1 -> 0
-        digitalWrite(RELAY_PIN, relay_state);
+    else if ((int) rpiJson["usb"] == 1) { // usbled toggle
+      if (currState != EVENT_STATE) { // usbled toggle doesn't affect event state
+        relayState = !relayState; // inverse current state
+        digitalWrite(RELAY_PIN, relayState);
         
-        if (RELAY_ON == relay_state) {
+        if (RELAY_ON == relayState) { // if toggling turned usbled on
           currState = CMD_ON_STATE;
-        } else {
+        } else { // if toggling turned usbled off
           currState = DARK_STATE;
         }
       }
 
-      Serial.print("usb is 1");
+      Serial.print("usb toggle");
     }
-    else if ((int) rpi_json["usb_on"] == 1) {
-      relay_state = RELAY_ON;
-      digitalWrite(RELAY_PIN, relay_state);
+    else if ((int) rpiJson["usb_on"] == 1) {
+      relayState = RELAY_ON;
+      digitalWrite(RELAY_PIN, relayState);
       currState = CMD_ON_STATE;
-      Serial.print("usb_on is 1");
+
+      Serial.print("usb_on");
     }
-    else if ((int) rpi_json["usb_off"] == 1) {
-      lightTimer = -10;
-      relay_state = RELAY_OFF;
-      digitalWrite(RELAY_PIN, relay_state);
+    else if ((int) rpiJson["usb_off"] == 1) {
+      lightTimer = -10; // handle edge case, usb_off right away
+
+      relayState = RELAY_OFF;
+      digitalWrite(RELAY_PIN, relayState);
       currState = DARK_STATE;
-      Serial.print("usb_off is 1");
+
+      Serial.print("usb_off");
     }
   });
 
-  mqtt_client.publish("iot/22100113", "Greetings from NodeMCU");
+  mqttClient.publish(mqttTopic, "Greetings from NodeMCU");
 }
