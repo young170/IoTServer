@@ -245,26 +245,22 @@ void onConnectionEstablished() {
     }
     else if ((int) rpiJson["led"] == 1) { // led toggle
       ledLightState = !ledLightState; // inverse current state
-      digitalWrite(LED_PIN, ledLightState);
 
       Serial.print("led toggle");
     }
     else if ((int) rpiJson["led_on"] == 1) {
       ledLightState = HIGH;
-      digitalWrite(LED_PIN, ledLightState);
 
       Serial.print("led_on");
     }
     else if ((int) rpiJson["led_off"] == 1) {
       ledLightState = LOW;
-      digitalWrite(LED_PIN, ledLightState);
 
       Serial.print("led_off");
     }
     else if ((int) rpiJson["usb"] == 1) { // usbled toggle
       if (currState != EVENT_STATE) { // usbled toggle doesn't affect event state
         relayState = !relayState; // inverse current state
-        digitalWrite(RELAY_PIN, relayState);
         
         if (RELAY_ON == relayState) { // if toggling turned usbled on
           currState = CMD_ON_STATE;
@@ -277,7 +273,6 @@ void onConnectionEstablished() {
     }
     else if ((int) rpiJson["usb_on"] == 1) {
       relayState = RELAY_ON;
-      digitalWrite(RELAY_PIN, relayState);
       currState = CMD_ON_STATE;
 
       Serial.print("usb_on");
@@ -286,11 +281,14 @@ void onConnectionEstablished() {
       lightTimer = -10; // handle edge case, usb_off right away
 
       relayState = RELAY_OFF;
-      digitalWrite(RELAY_PIN, relayState);
       currState = DARK_STATE;
 
       Serial.print("usb_off");
     }
+
+    // control of LED and USB LED
+    digitalWrite(LED_PIN, ledLightState);
+    digitalWrite(RELAY_PIN, relayState);
   });
 
   mqttClient.publish(mqttTopic, "Greetings from NodeMCU");

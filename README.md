@@ -11,7 +11,7 @@ IoT Server using NodeMCU and Raspberry pi
 ## Directory Structure
 ```
 Doc/
-    Report.docx
+    IoTServer_Report.docx
 Design/
     IoTServer/
         IoTServer.ino
