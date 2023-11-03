@@ -11,34 +11,26 @@ app.config['MQTT_USERNAME'] = 'iot'
 app.config['MQTT_PASSWORD'] = 'csee1414'
 mqtt = Mqtt(app)
 
-global mqtt_message
-mqtt_message = ''
+mqtt_temp1 = ''
+mqtt_hum1 = ''
+mqtt_cds1 = ''
+mqtt_temp2 = ''
+mqtt_hum2 = ''
+mqtt_cds2 = ''
 
-global mqtt_temp
-global mqtt_hum
-global mqtt_cds
-
-mqtt_temp = ''
-mqtt_hum = ''
-mqtt_cds = ''
-
-print('@@ Use URL:/iot/21900413/(led, dht22, cds)')
+print('@@ Use URL:/iot/21900413/(led, hum, cds)')
 
 @app.route('/iot/21900413/<cmd>')
 def get_command_1(cmd):
-    global mqtt_temp
-    global mqtt_hum
-    global mqtt_cds
+    global mqtt_temp1
+    global mqtt_hum1
+    global mqtt_cds1
 
     pub_topic = 'iot/21900413'
     data = {}
 
-    if cmd == 'temp':
-        data['temp'] = 1
-    elif cmd == 'cds':
-        data['cds'] = 1
-    elif cmd == 'dht22':
-        data['dht22'] = 1
+    if cmd == 'data':
+        data['data'] = 1
     elif cmd == 'led':
         data['led'] = 1
     elif cmd == 'led_on':
@@ -53,26 +45,21 @@ def get_command_1(cmd):
         data['usb_off'] = 1
 
     mqtt.publish(pub_topic, json.dumps(data, indent='\t'))
-
     time.sleep(1)
-    return render_template('PJ1_RPI_index.html', jh_temp=mqtt_temp, jh_hum=mqtt_hum, jh_cds=mqtt_cds)
+    return render_template('PJ1_RPI_index.html', jh_temp=mqtt_temp1, jh_hum=mqtt_hum1, jh_cds=mqtt_cds1, sb_temp=mqtt_temp2, sb_hum=mqtt_hum2, sb_cds=mqtt_cds2)
 
 @app.route('/iot/22100113/<cmd>')
 def get_command_2(cmd):
 
-    global mqtt_temp
-    global mqtt_hum
-    global mqtt_cds
+    global mqtt_temp2
+    global mqtt_hum2
+    global mqtt_cds2
 
     pub_topic = 'iot/22100113'
     data = {}
 
-    if cmd == 'temp':
-        data['temp'] = 1
-    elif cmd == 'cds':
-        data['cds']
-    elif cmd == 'dht22':
-        data['dht22'] = 1
+    if cmd == 'data':
+        data['data'] = 1
     elif cmd == 'led':
         data['led'] = 1
     elif cmd == 'led_on':
@@ -88,30 +75,39 @@ def get_command_2(cmd):
 
     mqtt.publish(pub_topic, json.dumps(data, indent='\t'))
     time.sleep(1)
-    return render_template('PJ1_RPI_index.html', sb_temp=mqtt_temp, sb_hum=mqtt_hum, sb_cds=mqtt_cds)
+    return render_template('PJ1_RPI_index.html', jh_temp=mqtt_temp1, jh_hum=mqtt_hum1, jh_cds=mqtt_cds1, sb_temp=mqtt_temp2, sb_hum=mqtt_hum2, sb_cds=mqtt_cds2)
 
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
-    mqtt.subscribe("iot/21900413/hdt")
-    mqtt.subscribe("iot/21900413/cds")
+    mqtt.subscribe('iot/21900413/data')
 
-    mqtt.subscribe("iot/22100113/hdt")
-    mqtt.subscribe("iot/22100113/cds")
+    mqtt.subscribe('iot/22100113/data')
 
 @mqtt.on_message()
 def handle_mqtt_message(client, userdata, message):
-    global mqtt_temp
-    global mqtt_hum
-    global mqtt_cds
+    global mqtt_temp1
+    global mqtt_hum1
+    global mqtt_cds1
+
+    global mqtt_temp2
+    global mqtt_hum2
+    global mqtt_cds2
 
     topic = message.topic
-    payload = message.payload.decode('utf-8')
+    payload = message.payload
     json_to_dic = json.loads(payload)
-    mqtt_temp = json_to_dic['temp']
-    mqtt_hum = json_to_dic['hum']
-    mqtt_cds = json_to_dic['cds']
-    print("Topic: ", topic, "temp: ", mqtt_temp, "hum: ", mqtt_hum, "cds: ", mqtt_cds)
+    print(payload)
 
+    if topic == 'iot/21900413/data':
+        mqtt_temp1 = json_to_dic['temp']
+        mqtt_hum1 = json_to_dic['hum']
+        mqtt_cds1 = json_to_dic['cds']
+
+    elif topic == 'iot/22100113/data':
+        mqtt_temp2 = json_to_dic['temp']
+        mqtt_hum2 = json_to_dic['hum']
+        mqtt_cds2 = json_to_dic['cds']
+    
 @app.route('/')
 def index():
     return render_template('PJ1_RPI_index.html')
