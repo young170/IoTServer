@@ -215,7 +215,7 @@ void cds_dht_mqtt_publish(void) {
   myObject["cds"] = lightValue;  
   String jsonString = JSON.stringify(myObject);
 
-  String pubTopic = mqttTopic += "/data"
+  String pubTopic = mqttTopic += "/data";
   mqttClient.publish(pubTopic, jsonString);
 }
 
