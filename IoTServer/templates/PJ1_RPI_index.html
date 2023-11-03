@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta http-equiv="refresh" content="10">
     <title>Lab4_rpi_flask_nodeMCU_LED_CONTROL</title>
 </head>
 <body>
@@ -17,8 +19,7 @@
 		<button type="button" onclick="location.href='/iot/21900413/usb'">USB</button>
         <button type="button" onclick="location.href='/iot/21900413/usb_on'">USB ON</button>
         <button type="button" onclick="location.href='/iot/21900413/usb_off'">USB OFF</button>
-        <a href="/iot/21900413/cds"><button>Get a Light Intensity</button></a>
-        <a href="/iot/21900413/dht"><button>Get temperature and humidity</button></a><br/>
+        <a href="/iot/21900413/data"><button>Get a Light Intensity, Temperature, Humidity</button></a>
         <p> Temperature: {{jh_temp}} Humidity: {{jh_hum}} CDS: {{jh_cds}}</p>
     </div>
 	<div style="width: 300px; margin: auto; text-align: center;">
@@ -29,8 +30,7 @@
 		<button type="button" onclick="location.href='/iot/22100113/usb'">USB</button>
         <button type="button" onclick="location.href='/iot/22100113/usb_on'">USB ON</button>
         <button type="button" onclick="location.href='/iot/22100113/usb_off'">USB OFF</button>
-        <a href="/iot/22100113/cds"><button>Get a Light Intensity</button></a>
-        <a href="/iot/22100113/dht"><button>Get temperature and humidity</button></a><br/>
+        <a href="/iot/22100113/data"><button>Get a Light Intensity, Temperature, Humidity</button></a>
         <p> Temperature: {{sb_temp}} Humidity: {{sb_hum}} CDS: {{sb_cds}}</p>
     </div>       
 </body>
